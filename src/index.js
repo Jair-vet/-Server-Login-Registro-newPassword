@@ -4,16 +4,7 @@ const cors = require("cors")
 
 const app = express();
 
-// app.use(cors());
-// app.use(cors({
-//     origin: '*', // Or use '*' to allow all origins
-// }));
-
-// app.use(cors({
-    //     origin: 'https://ownersclub.stown.mx',
-    //     credentials: true, // Enable sending of credentials
-// }));
-app.use('*', cors()); // Handle preflight requests for all routes
+app.use(cors());
 app.use(express.json());
 
 
