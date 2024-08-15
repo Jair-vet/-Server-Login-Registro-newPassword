@@ -44,18 +44,39 @@ module.exports = {
       // console.log(isValid, validationMessage);
 
       if (isValid) {
-        // Generar JWT si la membresía es válida
-        const token = await generateJWT(userData[0].id);
-        userData[0].token = token; // Incluir el token en la respuesta
-        
-  
-        connection.release();
-        myConnection.end();
-  
-        return res.status(200).json({
-          ok: true,
-          message: 'Membresía válida',
-          data: userData[0],
+        const userPasswordQuery = `SELECT password FROM ${table} WHERE correo = '${correo}' AND membresia = '${membresia}'`;
+        connection.query(userPasswordQuery, [correo, membresia], async (err, result) => {
+          if (err) {
+            connection.release();
+            myConnection.end();
+            return res.status(errors.errorQuery.code).json({
+              ok: false,
+              message: errors.errorQuery.message,
+            });
+          }
+
+          // If user already has a password
+          if (result[0] && result[0].password) {
+            connection.release();
+            myConnection.end();
+            return res.status(200).json({
+              ok: true,
+              message: 'Usuario ya tiene una contraseña',
+              redirectUrl: 'https://www.stown.mx/pages/owners-club',
+            });
+          }
+          // Generar JWT si la membresía es válida y no tiene contraseña
+          const token = await generateJWT(userData[0].id);
+          userData[0].token = token; // Incluir el token en la respuesta
+
+          connection.release();
+          myConnection.end();
+
+          return res.status(200).json({
+            ok: true,
+            message: 'Membresía válida',
+            data: userData[0],
+          });
         });
       } else {
         connection.release();
