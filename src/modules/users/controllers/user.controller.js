@@ -163,6 +163,180 @@ module.exports = {
     }
   },
 
+  validClient: async (req, res) => {
+    try {
+      const { correo, membresia } = req.body;
+  
+      const myConnection = pool.connection(constants.DATABASE);
+      myConnection.getConnection(async function (err, connection) {
+        if (err) {
+          return res.status(errors.errorConnection.code).json({
+            ok: false,
+            message: errors.errorConnection.message,
+          });
+        }
+  
+        try {
+          // Consulta para verificar el correo y la membresía
+          const [membershipValid, message ] = await isMembershipValid(table, correo, membresia, connection);
+          console.log(correo, membresia);
+          
+          if (!membershipValid) {
+            return res.status(404).json({
+              ok: false,
+              message,
+            });
+          }
+  
+          return res.status(200).json({
+            ok: true,
+            message: 'Usuario Valido',
+          });
+        } catch (innerError) {
+          console.log(innerError);
+          return res.status(500).json({
+            ok: false,
+            message: 'Error en el procesamiento de la solicitud',
+          });
+        } finally {
+          connection.release();
+          myConnection.end();
+        }
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({
+        ok: false,
+        message: 'Error en el servidor',
+      });
+    }
+  },
+
+  updatePassword: async (req, res) => {
+    try {
+      const { correo, membresia, newPassword } = req.body;
+  
+      const myConnection = pool.connection(constants.DATABASE);
+      myConnection.getConnection(async function (err, connection) {
+        if (err) {
+          return res.status(errors.errorConnection.code).json({
+            ok: false,
+            message: errors.errorConnection.message,
+          });
+        }
+  
+        try {
+          // Encriptar la nueva contraseña
+          const [encryptionSuccess, encryptionMessage, hashedPassword] = await encryptPassword(newPassword);
+          if (!encryptionSuccess) {
+            return res.status(500).json({
+              ok: false,
+              message: encryptionMessage,
+            });
+          }
+  
+          // Actualizar la contraseña en la base de datos
+          const [updateSuccess, updateMessage] = await updatePassword(table, correo, membresia, hashedPassword, connection);
+          console.log(updateMessage);
+          if (!updateSuccess) {
+            return res.status(500).json({
+              ok: false,
+              message: updateMessage,
+            });
+          }
+  
+          return res.status(200).json({
+            ok: true,
+            message: 'Contraseña actualizada exitosamente',
+          });
+        } catch (innerError) {
+          console.log(innerError);
+          return res.status(500).json({
+            ok: false,
+            message: 'Error en el procesamiento de la solicitud',
+          });
+        } finally {
+          connection.release();
+          myConnection.end();
+        }
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({
+        ok: false,
+        message: 'Error en el servidor',
+      });
+    }
+  },
+
+  obtainMembresia: async (req, res) => {
+    try {
+      const { correo, password } = req.body;
+
+      const myConnection = pool.connection(constants.DATABASE);
+      myConnection.getConnection(async function (err, connection) {
+        if (err) {
+          return res.status(500).json({
+            ok: false,
+            message: 'Error de conexión a la base de datos',
+          });
+        }
+
+        try {
+          // Consulta para obtener la contraseña encriptada y la membresía asociada al correo
+          const query = `SELECT password, membresia FROM ${table} WHERE correo = '${correo}'`;
+          connection.query(query, [correo], async (error, results) => {
+            if (error) {
+              return res.status(500).json({
+                ok: false,
+                message: 'Error en la consulta a la base de datos',
+              });
+            }
+
+            if (results.length === 0) {
+              return res.status(404).json({
+                ok: false,
+                message: 'Correo no encontrado',
+              });
+            }
+
+            const { password: hashedPassword, membresia } = results[0];
+
+            // Comparar la contraseña proporcionada con la almacenada
+            const passwordMatch = await bcrypt.compare(password, hashedPassword);
+            if (!passwordMatch) {
+              return res.status(401).json({
+                ok: false,
+                message: 'Contraseña incorrecta',
+              });
+            }
+
+            return res.status(200).json({
+              ok: true,
+              message: 'Validación exitosa',
+              membresia, // Retornar la membresía si la validación es exitosa
+            });
+          });
+        } catch (innerError) {
+          console.log(innerError);
+          return res.status(500).json({
+            ok: false,
+            message: 'Error en el procesamiento de la solicitud',
+          });
+        } finally {
+          connection.release();
+          myConnection.end();
+        }
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({
+        ok: false,
+        message: 'Error en el servidor',
+      });
+    }
+  },
+
   getClient: async (req, res) => {
     try {
       const { correo, membresia } = req.body;
